@@ -16,6 +16,7 @@ import android.database.Cursor;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.util.Log;
@@ -109,10 +110,10 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
 	@Override
     protected void onPause() {
         super.onPause();
-        if (speech != null) {
+        /*if (speech != null) {
             speech.destroy();
             Log.i(LOG_TAG, "destroy");
-        }
+        }*/
  
     }
 	
@@ -160,19 +161,27 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
 
 	@Override
 	public void onResults(Bundle results) {
+		final Bundle results1 = results;
         mResultAvailable = true;
-        Log.d(LOG_TAG, "onResults " + results);
-
-        mResults = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+        Log.d(LOG_TAG, "onResults " + results1);
+        mResults = results1.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
         commandProcessorImpl = new CommandProcessorImpl();
-        returnedText.setText(mResults.iterator().next());
+        //returnedText.setText(mResults.iterator().next());
         try {
 			commandProcessorImpl.filterUserInputText(mResults);
 		}catch (Exception e) {
 			Log.d(LOG_TAG, "error occured onResult : " + e);
 		}
         returnedText.setText(mResults.iterator().next());
-        startListening();
+        Runnable runnable = new Runnable() {			
+			@Override
+			public void run() {
+				startListening();
+                
+			}
+		};
+        new Thread(runnable).start();
+        
 	}
 
 	@Override
@@ -227,6 +236,10 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
     }
 	
 	public class CommandProcessorImpl implements CommandProcessor {
+		
+		public CommandProcessorImpl getInstance(){
+			return new CommandProcessorImpl();
+		}
 
 		@Override
 		public void openObject(List<String> mResult) throws Exception {
@@ -248,6 +261,7 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
 		@Override
 		public void callPhoneNumber(List<String> mResult) throws Exception {
 			String phoneNumber ="";
+			Log.i(LOG_TAG, "callPhoneNumber calling : " + mResult.get(1).toString());
 			phoneNumber = getPhoneNumber(mResult.get(1).toString(), getApplicationContext());
 			if(!phoneNumber.equalsIgnoreCase("Unsaved")){
 				Intent intent = new Intent(Intent.ACTION_CALL);
@@ -260,7 +274,28 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
 
 		@Override
 		public void playMusic(List<String> mResult) throws Exception {
-			playMusic();
+			//playMusic();
+			runOnUiThread(new Runnable() {
+				
+				@Override
+				public void run() {
+					// Read Mp3 file present under SD card
+		        	MediaPlayer mPlayer;
+		        	Log.i(LOG_TAG, "playMusic playing music : " );
+		            Uri myUri1 = Uri.parse("file:///sdcard/songs/Dagabaaz Re - Dabangg 2.mp3");
+		            mPlayer  = new MediaPlayer();
+		            mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+		            try {
+		                mPlayer.setDataSource(getApplicationContext(), myUri1);
+		                mPlayer.prepare();
+		                // Start playing the Music file
+		                mPlayer.start();
+		                    
+		            } catch (Exception e) {
+		                e.printStackTrace();
+		            }
+				}
+			});
 		}
 		
 		public String getPhoneNumber(String name, Context context) {
@@ -296,7 +331,7 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
 				searchText(mResultList);
 			}if(mResultList.contains("call")){
 				callPhoneNumber(mResultList);
-			}if(mResultList.contains("play music")){
+			}if(mResultList.contains("play") && mResultList.contains("music")){
 				playMusic(mResultList);
 			}
 			
@@ -306,7 +341,8 @@ public class JARVISActivity extends ActionBarActivity implements RecognitionList
         protected void playMusic(){
             // Read Mp3 file present under SD card
         	MediaPlayer mPlayer;
-            Uri myUri1 = Uri.parse("file:///sdcard/jai_ho.mp3");
+        	Log.i(LOG_TAG, "playMusic playing music : " );
+            Uri myUri1 = Uri.parse("file:///sdcard/songs/Dagabaaz Re - Dabangg 2.mp3");
             mPlayer  = new MediaPlayer();
             mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             try {
